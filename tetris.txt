@@ -1,0 +1,302 @@
+from cmu_graphics import *
+import random
+
+#Dual rotation (both clockwise and counterclockwise rotation)
+#Levels of play with increasing difficulty (dropping faster)
+#A High Scores List (though we currently have no way to save this once you close the app).
+
+def onAppStart(app):
+    app.rows = 12
+    app.cols = 8
+    app.boardLeft = 95
+    app.boardTop = 70
+    app.boardWidth = 210
+    app.boardHeight = 280
+    app.cellBorderWidth = 1
+    app.board = [([None] * app.cols) for row in range(app.rows)]
+    app.nextPieceIndex = 0
+    app.piece = 0
+    app.pieceTopRow = 0
+    app.pieceLeftCol = app.cols//2
+    app.paused = False
+    app.stepsPerSecond = 1
+    app.seconds = 0
+    app.score = 0
+    app.isGameOver = False
+    app.isClockwise = True
+    app.pastScores = []
+    app.highScore = None
+    app.factor = 10
+    loadTetrisPieces(app)
+    loadNextPiece(app)
+
+def loadTetrisPieces(app):
+        # Seven "standard" pieces (tetrominoes)
+        iPiece = [[  True,  True,  True,  True ]]
+        jPiece = [[  True, False, False ],
+                  [  True,  True,  True ]]
+        lPiece = [[ False, False,  True ],
+                  [  True,  True,  True ]]
+        oPiece = [[  True,  True ],
+                  [  True,  True ]]
+        sPiece = [[ False,  True,  True ],
+                  [  True,  True, False ]]
+        tPiece = [[ False,  True, False ],
+                  [  True,  True,  True ]]
+        zPiece = [[  True,  True, False ],
+                  [ False,  True,  True ]] 
+        app.tetrisPieces = [ iPiece, jPiece, lPiece, oPiece,
+                             sPiece, tPiece, zPiece ]
+        app.tetrisPieceColors = [ 'red', 'yellow', 'magenta', 'pink',
+                                  'cyan', 'green', 'orange' ]
+                                  
+def redrawAll(app):
+    scoreText = f'Score: {app.score}'
+    drawLabel(scoreText, 200, 30, size=16)
+    highScoreText = f'High Score: {app.highScore}'
+    if app.isGameOver: drawLabel('GAME OVER', 200, 50, size = 16, fill = 'red')
+    else: 
+        if app.highScore != None: drawLabel(highScoreText, 200, 50, size = 12)
+    drawBoard(app)
+    drawPiece(app)
+    drawBoardBorder(app)
+
+def drawBoard(app):
+    for row in range(app.rows):
+        for col in range(app.cols):
+            color = app.board[row][col]
+            drawCell(app, row, col, color)
+
+def drawBoardBorder(app):
+  # draw the board outline (with double-thickness):
+  drawRect(app.boardLeft, app.boardTop, app.boardWidth, app.boardHeight,
+           fill=None, border='black',
+           borderWidth=2*app.cellBorderWidth)
+
+def drawCell(app, row, col, color):
+    cellLeft, cellTop = getCellLeftTop(app, row, col)
+    cellWidth, cellHeight = getCellSize(app)
+    drawRect(cellLeft, cellTop, cellWidth, cellHeight,
+             fill=color, border='black',
+             borderWidth=app.cellBorderWidth)
+
+def getCellLeftTop(app, row, col):
+    cellWidth, cellHeight = getCellSize(app)
+    cellLeft = app.boardLeft + col * cellWidth
+    cellTop = app.boardTop + row * cellHeight
+    return (cellLeft, cellTop)
+
+def getCellSize(app):
+    cellWidth = app.boardWidth / app.cols
+    cellHeight = app.boardHeight / app.rows
+    return (cellWidth, cellHeight)
+
+def resizeBoard(app, numRows, numCols, boardSize):
+    app.rows = numRows
+    app.cols = numCols
+    app.boardLeft, app.boardWidth, app.boardHeight = boardSize
+    app.board = [([None] * app.cols) for row in range(app.rows)]
+
+def loadPiece(app, pieceIndex):
+    app.piece = app.tetrisPieces[pieceIndex]
+    app.pieceTopRow = 0
+    pieceCols = 0
+    for row in app.piece:
+        pieceCols = max(pieceCols, len(row))
+    #app.pieceLeftCol = app.cols//2 - pieceCols//2
+    app.pieceLeftCol = (app.cols - pieceCols)//2
+    app.pieceColor = app.tetrisPieceColors[pieceIndex]
+    
+def onKeyPress(app, key):
+    if ('0' <= key <= '6'):
+        loadPiece(app, int(key))
+    elif key == 'left': movePiece(app, 0, -1)
+    elif key == 'right': movePiece(app, 0, +1)
+    elif key == 'down': 
+        app.isClockwise = False
+        rotatePiece(app)
+    elif key == 's': takeStep(app)
+    elif key == 'up': 
+        app.isClockwise = True
+        rotatePiece(app)
+    elif key == 'space': hardDropPiece(app)
+    elif key == 'p': app.paused = not app.paused
+    elif key in ['a','b','c','d','e','f','g','h']: loadTestBoard(app, key)
+    elif key == 'r': reset(app)
+    
+def loadTestBoard(app, key):
+    # DO NOT EDIT THIS FUNCTION
+    # We are providing you with this function to set up the board
+    # with some test cases for clearing the rows.
+    # To use this: press 'a', 'b', through 'h' to select a test board.
+    # Then press 'space' for a hard drop of the red I,
+    # and then press 's' to step, which in most cases will result
+    # in some full rows being cleared.
+
+    # 1. Clear the board and load the red I piece 
+    app.board = [([None] * app.cols) for row in range(app.rows)]
+    app.nextPieceIndex = 0
+    loadNextPiece(app)
+    # 2. Move and rotate the I piece so it is vertical, in the
+    #    top-left corner
+    for keyName in ['down', 'down', 'up', 'left', 'left', 'left']:
+        onKeyPress(app, keyName)
+    # 3. Add a column of alternating plum and lavender cells down
+    #    the rightmost column
+    for row in range(app.rows):
+        app.board[row][-1] = 'plum' if (row % 2 == 0) else 'lavender'
+    # 4. Now almost fill some of the bottom rows, leaving just the
+    #    leftmost column empty
+    indexesFromBottom = [ [ ], [0], [0,1], [0,1,2], [0,2],
+                          [1,2,3], [1,2,4], [0,2,3,5] ]
+    colors = ['moccasin', 'aqua', 'khaki', 'aquamarine',
+              'darkKhaki', 'peachPuff']
+    for indexFromBottom in indexesFromBottom[ord(key) - ord('a')]:
+        row = app.rows - 1 - indexFromBottom
+        color = colors[indexFromBottom]
+        for col in range(1, app.cols):
+            app.board[row][col] = color
+        
+def movePiece(app, drow, dcol):
+    app.pieceTopRow += drow
+    app.pieceLeftCol += dcol
+    if pieceIsLegal(app) == False: 
+        app.pieceTopRow -= drow
+        app.pieceLeftCol -= dcol
+        return False
+    return True
+    
+def pieceIsLegal(app):
+    for row in range(len(app.piece)):
+        for col in range(len(app.piece[row])):
+            #if 0 <= app.pieceTopRow + row < app.rows and 0 <= app.pieceLeftCol + col < app.cols and app.board[app.pieceTopRow + row][app.pieceLeftCol + col] == None:
+            if app.piece[row][col] == True:
+                if 0 > app.pieceTopRow + row or app.pieceTopRow + row >= app.rows: return False
+                elif 0 > app.pieceLeftCol + col or app.pieceLeftCol + col >= app.cols: return False
+                elif app.board[app.pieceTopRow + row][app.pieceLeftCol + col] != None: return False 
+    return True
+
+def drawPiece(app):
+    for row in range(len(app.piece)):
+        for col in range(len(app.piece[row])):
+            if app.piece[row][col] == True:
+                drawCell(app, app.pieceTopRow + row, app.pieceLeftCol + col, app.pieceColor)
+
+def hardDropPiece(app):
+    while movePiece(app, +1, 0):
+        pass
+
+def rotate2dListClockwise(L):
+    M = []
+    for col in range(len(L[0])):
+        newCol = []
+        for row in range(len(L) -1, -1, -1):
+            newCol.append(L[row][col])
+        M.append(newCol)
+    return M
+    
+def rotate2dListCounterClockwise(L):
+    M = []
+    for col in range(len(L[0]) -1, -1, -1):
+        newCol = []
+        for row in range(len(L)):
+            newCol.append(L[row][col])
+        M.append(newCol)
+    return M
+    
+def rotatePiece(app):
+    oldPiece = app.piece
+    oldTopRow = app.pieceTopRow
+    oldLeftCol = app.pieceLeftCol
+    oldRows = len(app.piece)
+    oldCols = 0
+    for row in app.piece:
+        oldCols = max(oldCols, len(row))
+    
+    if app.isClockwise == True: app.piece = rotate2dListClockwise(app.piece)
+    else: app.piece = rotate2dListCounterClockwise(app.piece)
+    centerRow = oldTopRow + oldRows//2
+    centerCol = oldLeftCol + oldCols//2
+    
+    newRows = len(app.piece)
+    newCols = 0
+    for row in app.piece:
+        newCols = max(newCols, len(row))
+    app.pieceTopRow = centerRow - newRows//2
+    app.pieceLeftCol = centerCol - newCols//2
+    
+    if pieceIsLegal(app) == False:
+        app.piece = oldPiece
+        app.pieceTopRow = oldTopRow
+        app.pieceLeftCol = oldLeftCol
+
+def loadNextPiece(app):
+    pieceIndex = random.randrange(len(app.tetrisPieces))
+    loadPiece(app, pieceIndex)
+    if pieceIsLegal(app) == False:
+        app.isGameOver = True
+    #app.nextPieceIndex += 1
+    #if app.nextPieceIndex >= len(app.tetrisPieces): app.nextPieceIndex = 0
+
+def onStep(app):
+    if app.paused == False:
+        if app.seconds > 10 and app.seconds % app.factor == 0: 
+            app.stepsPerSecond += 1
+            app.factor += 5
+        takeStep(app)
+    
+def takeStep(app):
+    if not movePiece(app, +1, 0):
+        app.seconds += 1
+        placePieceOnBoard(app)
+        removeFullRows(app)
+        loadNextPiece(app)
+        gameOver(app)
+        
+def gameOver(app):
+    if app.isGameOver == True: 
+        app.isPaused = True
+        app.pastScores.append(int(app.score))
+    
+def reset(app):
+    app.board = [([None] * app.cols) for row in range(app.rows)]
+    app.nextPieceIndex = 0
+    app.piece = random.randrange(len(app.tetrisPieces))
+    app.pieceTopRow = 0
+    app.pieceLeftCol = app.cols//2
+    app.paused = False
+    app.stepsPerSecond = 1
+    app.seconds = 0
+    app.score = 0
+    app.isGameOver = False
+    app.factor = 5
+    app.highScore = max(app.pastScores)
+    loadTetrisPieces(app)
+    loadNextPiece(app)
+
+def removeFullRows(app):
+    i = 0
+    count = 0
+    while i < len(app.board):
+        if None not in app.board[i]:
+            app.board.pop(i)
+            app.score += 100
+            count += 1
+        else: i += 1
+        app.score *= count
+        #i believe this is the expectation for the score
+    while len(app.board) < app.rows:
+        emptyRow = ([None] * app.cols)
+        app.board.insert(0, emptyRow)
+
+def placePieceOnBoard(app):
+    for row in range(len(app.piece)):
+        for col in range(len(app.piece[row])):
+            if app.piece[row][col] == True:
+                app.board[app.pieceTopRow + row][app.pieceLeftCol + col] = app.pieceColor
+
+
+def main():
+    runApp()
+
+main()
